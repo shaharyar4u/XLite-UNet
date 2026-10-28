@@ -1,10 +1,10 @@
-"""Speed checks on one GPU (AMP, 4x128^3 patches, cuDNN autotuning on).
+"""Speed micro-benchmark (Section 5.2 of the paper). One GPU, mixed precision, 4x128^3 patches.
 
-  train : one fwd+bwd+step at batch 4
-  infer : one forward pass at batch 1, no grad
-Variants: memory format (default vs channels_last_3d) and XLite kernel size 5 vs 3.
+  train : one forward + backward + optimiser step at batch 4
+  infer : one forward pass at batch 1, no gradients
+Variants: cuDNN autotuning off/on, memory format (default vs channels_last_3d), XLite kernel 5 vs 3.
 
-  python tests/bench_speed.py
+  python tests/bench_speed.py | tee logs/bench_speed.txt
 """
 import os
 import sys
@@ -14,8 +14,6 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.factory import build_model  # noqa: E402
-
-torch.backends.cudnn.benchmark = True
 
 
 def timed(fn, steps=10, warm=3):
@@ -27,7 +25,8 @@ def timed(fn, steps=10, warm=3):
     return (time.time() - t0) / steps
 
 
-def run(cfg, cl):
+def run(cfg, autotune, cl):
+    torch.backends.cudnn.benchmark = autotune
     fmt = torch.channels_last_3d if cl else torch.contiguous_format
     m = build_model({"patch": [128, 128, 128], **cfg}).cuda().to(memory_format=fmt)
     opt = torch.optim.AdamW(m.parameters(), 1e-3)
@@ -50,12 +49,12 @@ def run(cfg, cl):
     return timed(train), timed(infer)
 
 
-tests = [
-    ("xlite k5", {"model": "xlite", "kernel": 5}),
-    ("xlite k3", {"model": "xlite", "kernel": 3}),
-    ("unet3d", {"model": "unet3d"}),
-]
+print("GPU:", torch.cuda.get_device_name(0), "| torch", torch.__version__, "| cuDNN", torch.backends.cudnn.version())
+tests = [("xlite k5", {"model": "xlite", "kernel": 5}),
+         ("xlite k3", {"model": "xlite", "kernel": 3}),
+         ("unet3d", {"model": "unet3d"})]
 for name, cfg in tests:
-    for cl in (False, True):
-        tr, inf = run(cfg, cl)
-        print(f"{name:9s} channels_last={cl!s:5s}  train {tr:.3f} s/step   infer {inf * 1000:.0f} ms/patch", flush=True)
+    for autotune, cl in ((False, False), (True, False), (True, True)):
+        tr, inf = run(cfg, autotune, cl)
+        print(f"{name:9s} autotune={autotune!s:5s} channels_last={cl!s:5s}  "
+              f"train {tr:.3f} s/step   infer {inf * 1000:.0f} ms/patch", flush=True)
