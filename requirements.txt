@@ -1,0 +1,11 @@
+# install torch first for your CUDA version: https://pytorch.org/get-started/locally/
+monai>=1.3      # tested with 1.6.1
+nibabel>=5.0
+numpy
+scipy
+pandas
+matplotlib
+captum>=0.7
+pyyaml
+tqdm
+einops      # needed by UNETR and Swin UNETR

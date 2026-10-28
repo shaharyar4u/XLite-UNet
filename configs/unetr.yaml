@@ -1,0 +1,23 @@
+# Experiment config. Edit data_root, splits, out_dir and cache_dir for your lab machine.
+run_name: unetr
+model: unetr
+data_root: /path/to/ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData.zip   # the zip is read directly; an extracted folder also works
+splits: splits/splits.json
+out_dir: runs
+cache_dir: ram          # in-RAM cache (server has 2 TB RAM); a folder = disk cache; null = none
+seed: 42
+
+# architecture
+
+# training
+patch: [128, 128, 128]
+batch_size: 2
+samples_per_volume: 2   # crops per loaded case -> effective batch 4
+epochs: 300
+warmup_epochs: 5
+lr: 0.0001
+weight_decay: 0.00001
+loss: dicece         # dicece | dicefocal (ablation)
+amp: true
+num_workers: 16
+val_every: 10
